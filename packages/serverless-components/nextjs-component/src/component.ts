@@ -347,6 +347,7 @@ class NextjsComponent extends Component {
         nextConfigDir: nextConfigPath,
         nextStaticDir: nextStaticPath,
         credentials: this.context.credentials.aws,
+        prerenderRoutes: defaultBuildManifest.pages.ssg.nonDynamic,
         publicDirectoryCache: inputs.publicDirectoryCache
       });
     } else {

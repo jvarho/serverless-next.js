@@ -43,6 +43,13 @@ const upload = (
       secretAccessKey: "fake-secret-key",
       sessionToken: "fake-session-token"
     },
+    prerenderRoutes: {
+      "/revalidate": {
+        initialRevalidateSeconds: 60,
+        srcRoute: "/revalidate",
+        dataRoute: "/_next/data/zsWqBqLjpgRmswfQomanp/revalidate.json"
+      }
+    },
     publicDirectoryCache: publicAssetCache
   });
 };
@@ -163,6 +170,27 @@ describe.each`
       );
     });
 
+    it("uploads revalidate HTML pages with expires instead of cache-control", async () => {
+      expect(mockUpload).toBeCalledWith(
+        expect.objectContaining({
+          Key: "static-pages/zsWqBqLjpgRmswfQomanp/revalidate.html",
+          ContentType: "text/html"
+        })
+      );
+      const call = mockUpload.mock.calls.find(
+        (call) =>
+          call[0].Key === "static-pages/zsWqBqLjpgRmswfQomanp/revalidate.html"
+      );
+      expect(call[0]).toHaveProperty("Expires");
+      expect(call[0].CacheControl).toEqual(undefined);
+      expect(new Date(call[0].Expires).getTime()).toBeGreaterThan(
+        new Date().getTime()
+      );
+      expect(new Date(call[0].Expires).getTime()).toBeLessThan(
+        new Date().getTime() + 60000
+      );
+    });
+
     it("uploads staticProps JSON files in _next/data", async () => {
       expect(mockUpload).toBeCalledWith(
         expect.objectContaining({
@@ -194,6 +222,27 @@ describe.each`
           ContentType: "application/json",
           CacheControl: SERVER_CACHE_CONTROL_HEADER
         })
+      );
+    });
+
+    it("uploads revalidate _next/data JSON with expires instead of cache-control", async () => {
+      expect(mockUpload).toBeCalledWith(
+        expect.objectContaining({
+          Key: "_next/data/zsWqBqLjpgRmswfQomanp/revalidate.json",
+          ContentType: "application/json"
+        })
+      );
+      const call = mockUpload.mock.calls.find(
+        (call) =>
+          call[0].Key === "_next/data/zsWqBqLjpgRmswfQomanp/revalidate.json"
+      );
+      expect(call[0]).toHaveProperty("Expires");
+      expect(call[0].CacheControl).toEqual(undefined);
+      expect(new Date(call[0].Expires).getTime()).toBeGreaterThan(
+        new Date().getTime()
+      );
+      expect(new Date(call[0].Expires).getTime()).toBeLessThan(
+        new Date().getTime() + 60000
       );
     });
 

@@ -7,12 +7,17 @@ import {
   SERVER_NO_CACHE_CACHE_CONTROL_HEADER,
   SERVER_CACHE_CONTROL_HEADER
 } from "./lib/constants";
+import getPageName from "./lib/getPageName";
 import S3ClientFactory, { Credentials } from "./lib/s3";
 import pathToPosix from "./lib/pathToPosix";
-import { PrerenderManifest } from "next/dist/build/index";
+import { PrerenderManifest, SsgRoute } from "next/dist/build/index";
 import getPublicAssetCacheControl, {
   PublicDirectoryCache
 } from "./lib/getPublicAssetCacheControl";
+
+type PrerenderRoutes = {
+  [path: string]: SsgRoute;
+};
 
 type UploadStaticAssetsOptions = {
   bucketName: string;
@@ -20,6 +25,7 @@ type UploadStaticAssetsOptions = {
   nextConfigDir: string;
   nextStaticDir?: string;
   credentials: Credentials;
+  prerenderRoutes?: PrerenderRoutes;
   publicDirectoryCache?: PublicDirectoryCache;
 };
 
@@ -29,6 +35,7 @@ type AssetDirectoryFileCachePoliciesOptions = {
   // .i.e. by default .serverless_nextjs
   serverlessBuildOutDir: string;
   nextStaticDir?: string;
+  prerenderRoutes: PrerenderRoutes;
   publicDirectoryCache?: PublicDirectoryCache;
 };
 
@@ -38,13 +45,19 @@ type AssetDirectoryFileCachePoliciesOptions = {
 const getAssetDirectoryFileCachePolicies = (
   options: AssetDirectoryFileCachePoliciesOptions
 ): Array<{
-  cacheControl: string | undefined;
+  cacheControl?: string;
+  expires?: Date;
   path: {
     relative: string;
     absolute: string;
   };
 }> => {
-  const { basePath, publicDirectoryCache, serverlessBuildOutDir } = options;
+  const {
+    basePath,
+    prerenderRoutes,
+    publicDirectoryCache,
+    serverlessBuildOutDir
+  } = options;
 
   const normalizedBasePath = basePath ? basePath.slice(1) : "";
 
@@ -75,20 +88,39 @@ const getAssetDirectoryFileCachePolicies = (
 
   // Upload Next.js data files
 
-  const nextDataFiles = readDirectoryFiles(
-    path.join(assetsOutputDirectory, normalizedBasePath, "_next", "data")
+  const nextDataDir = path.join(
+    assetsOutputDirectory,
+    normalizedBasePath,
+    "_next",
+    "data"
   );
+  const nextDataFiles = readDirectoryFiles(nextDataDir);
 
-  const nextDataFilesUploads = nextDataFiles.map((fileItem) => ({
-    path: fileItem.path,
-    cacheControl: SERVER_CACHE_CONTROL_HEADER
-  }));
+  const nextDataFilesUploads = nextDataFiles.map((fileItem) => {
+    const route = prerenderRoutes[getPageName(fileItem.path, nextDataDir)];
+    if (route && route.initialRevalidateSeconds) {
+      const expires = new Date(
+        new Date().getTime() + 1000 * route.initialRevalidateSeconds
+      );
+      return {
+        path: fileItem.path,
+        expires
+      };
+    }
+    return {
+      path: fileItem.path,
+      cacheControl: SERVER_CACHE_CONTROL_HEADER
+    };
+  });
 
   // Upload Next.js HTML pages
 
-  const htmlPages = readDirectoryFiles(
-    path.join(assetsOutputDirectory, normalizedBasePath, "static-pages")
+  const htmlDir = path.join(
+    assetsOutputDirectory,
+    normalizedBasePath,
+    "static-pages"
   );
+  const htmlPages = readDirectoryFiles(htmlDir);
 
   const htmlPagesUploads = htmlPages.map((fileItem) => {
     // Dynamic fallback HTML pages should never be cached as it will override actual pages once generated and stored in S3.
@@ -98,12 +130,23 @@ const getAssetDirectoryFileCachePolicies = (
         path: fileItem.path,
         cacheControl: SERVER_NO_CACHE_CACHE_CONTROL_HEADER
       };
-    } else {
+    }
+
+    const route = prerenderRoutes[getPageName(fileItem.path, htmlDir)];
+    if (route && route.initialRevalidateSeconds) {
+      const expires = new Date(
+        new Date().getTime() + 1000 * route.initialRevalidateSeconds
+      );
       return {
         path: fileItem.path,
-        cacheControl: SERVER_CACHE_CONTROL_HEADER
+        expires
       };
     }
+
+    return {
+      path: fileItem.path,
+      cacheControl: SERVER_CACHE_CONTROL_HEADER
+    };
   });
 
   // Upload user static and public files
@@ -132,14 +175,14 @@ const getAssetDirectoryFileCachePolicies = (
     ...htmlPagesUploads,
     ...publicAndStaticUploads,
     buildIdUpload
-  ].map(({ cacheControl, path: absolutePath }) => ({
-    cacheControl,
+  ].map(({ path: absolutePath, ...rest }) => ({
     path: {
       // Path relative to the assets folder, used for the S3 upload key
       relative: path.relative(assetsOutputDirectory, absolutePath),
       // Absolute path of local asset
       absolute: absolutePath
-    }
+    },
+    ...rest
   }));
 };
 
@@ -155,11 +198,14 @@ const uploadStaticAssetsFromBuild = async (
     bucketName,
     credentials,
     basePath,
+    prerenderRoutes,
     publicDirectoryCache,
     nextConfigDir
   } = options;
+
   const files = getAssetDirectoryFileCachePolicies({
     basePath,
+    prerenderRoutes: prerenderRoutes ?? {},
     publicDirectoryCache,
     serverlessBuildOutDir: path.join(nextConfigDir, ".serverless_nextjs")
   });
@@ -173,7 +219,8 @@ const uploadStaticAssetsFromBuild = async (
       s3.uploadFile({
         s3Key: pathToPosix(file.path.relative),
         filePath: file.path.absolute,
-        cacheControl: file.cacheControl
+        cacheControl: file.cacheControl,
+        expires: file.expires
       })
     )
   );

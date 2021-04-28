@@ -12,6 +12,7 @@ type S3ClientFactoryOptions = {
 type UploadFileOptions = {
   filePath: string;
   cacheControl?: string;
+  expires?: Date;
   s3Key?: string;
 };
 
@@ -73,7 +74,7 @@ export default async ({
     uploadFile: async (
       options: UploadFileOptions
     ): Promise<AWS.S3.ManagedUpload.SendData> => {
-      const { filePath, cacheControl, s3Key } = options;
+      const { filePath, cacheControl, expires, s3Key } = options;
 
       const fileBody = await fse.readFile(filePath);
 
@@ -83,7 +84,8 @@ export default async ({
           Key: s3Key || filePath,
           Body: fileBody,
           ContentType: getMimeType(filePath),
-          CacheControl: cacheControl || undefined
+          CacheControl: cacheControl || undefined,
+          Expires: expires
         })
         .promise();
     },
