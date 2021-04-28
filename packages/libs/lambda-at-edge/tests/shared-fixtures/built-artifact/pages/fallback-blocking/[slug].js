@@ -9,7 +9,8 @@ module.exports = {
       renderOpts: {
         pageData: {
           page: "pages/fallback-blocking/[slug].js"
-        }
+        },
+        revalidate: 300
       }
     });
   }

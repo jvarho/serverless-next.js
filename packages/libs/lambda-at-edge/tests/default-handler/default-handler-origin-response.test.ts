@@ -166,24 +166,57 @@ describe("Lambda@Edge origin response", () => {
       expect(decodedBody).toEqual("<div>Rendered Page</div>");
       expect(cfResponse.status).toEqual(200);
 
-      expect(s3Client.send).toHaveBeenNthCalledWith(1, {
-        Command: "PutObjectCommand",
-        Bucket: "my-bucket.s3.amazonaws.com",
-        Key: "_next/data/build-id/fallback-blocking/not-yet-built.json",
-        Body: JSON.stringify({
-          page: "pages/fallback-blocking/[slug].js"
-        }),
-        ContentType: "application/json",
-        CacheControl: "public, max-age=0, s-maxage=2678400, must-revalidate"
+      expect(s3Client.send).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          Command: "PutObjectCommand",
+          Bucket: "my-bucket.s3.amazonaws.com",
+          Key: "_next/data/build-id/fallback-blocking/not-yet-built.json",
+          Body: JSON.stringify({
+            page: "pages/fallback-blocking/[slug].js"
+          }),
+          ContentType: "application/json"
+        })
+      );
+      expect(s3Client.send).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          Command: "PutObjectCommand",
+          Bucket: "my-bucket.s3.amazonaws.com",
+          Key: "static-pages/build-id/fallback-blocking/not-yet-built.html",
+          Body: "<div>Rendered Page</div>",
+          ContentType: "text/html"
+        })
+      );
+    });
+
+    it("uploads with revalidate-based expires", async () => {
+      const event = createCloudFrontEvent({
+        uri: "/fallback-blocking/not-yet-built.html",
+        host: "mydistribution.cloudfront.net",
+        config: { eventType: "origin-response" } as any,
+        response: {
+          headers: {},
+          status: "403"
+        } as any
       });
-      expect(s3Client.send).toHaveBeenNthCalledWith(2, {
-        Command: "PutObjectCommand",
-        Bucket: "my-bucket.s3.amazonaws.com",
-        Key: "static-pages/build-id/fallback-blocking/not-yet-built.html",
-        Body: "<div>Rendered Page</div>",
-        ContentType: "text/html",
-        CacheControl: "public, max-age=0, s-maxage=2678400, must-revalidate"
-      });
+
+      mockPageRequire("pages/fallback-blocking/[slug].js");
+
+      await handler(event);
+
+      expect(
+        (s3Client.send as jest.Mock).mock.calls[0][0].Expires.getTime()
+      ).toBeGreaterThan(new Date().getTime());
+      expect(
+        (s3Client.send as jest.Mock).mock.calls[0][0].Expires.getTime()
+      ).toBeLessThan(new Date().getTime() + 300000);
+      expect(
+        (s3Client.send as jest.Mock).mock.calls[1][0].Expires.getTime()
+      ).toBeGreaterThan(new Date().getTime());
+      expect(
+        (s3Client.send as jest.Mock).mock.calls[1][0].Expires.getTime()
+      ).toBeLessThan(new Date().getTime() + 300000);
     });
 
     it("renders and uploads HTML and JSON for fallback SSG data requests", async () => {

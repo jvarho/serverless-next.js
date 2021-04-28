@@ -655,6 +655,12 @@ const handleOriginResponse = async ({
       "passthrough"
     );
     if (isSSG) {
+      const cacheControl = renderOpts.revalidate
+        ? undefined
+        : "public, max-age=0, s-maxage=2678400, must-revalidate";
+      const expires = renderOpts.revalidate
+        ? new Date(new Date().getTime() + 1000 * renderOpts.revalidate)
+        : undefined;
       const baseKey = uri
         .replace(/^\//, "")
         .replace(/\.(json|html)$/, "")
@@ -666,14 +672,16 @@ const handleOriginResponse = async ({
         Key: `${s3BasePath}${jsonKey}`,
         Body: JSON.stringify(renderOpts.pageData),
         ContentType: "application/json",
-        CacheControl: "public, max-age=0, s-maxage=2678400, must-revalidate"
+        CacheControl: cacheControl,
+        Expires: expires
       };
       const s3HtmlParams = {
         Bucket: bucketName,
         Key: `${s3BasePath}${htmlKey}`,
         Body: html,
         ContentType: "text/html",
-        CacheControl: "public, max-age=0, s-maxage=2678400, must-revalidate"
+        CacheControl: cacheControl,
+        Expires: expires
       };
       const { PutObjectCommand } = await import(
         "@aws-sdk/client-s3/commands/PutObjectCommand"
