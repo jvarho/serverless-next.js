@@ -9,6 +9,7 @@ import lambdaAtEdgeCompat from "@sls-next/next-aws-cloudfront";
 import {
   CloudFrontOrigin,
   CloudFrontRequest,
+  CloudFrontResponse,
   CloudFrontResultResponse,
   CloudFrontS3Origin
 } from "aws-lambda";
@@ -603,6 +604,7 @@ const handleOriginResponse = async ({
   const { uri } = request;
   const { status } = response;
   if (status !== "403") {
+    setCacheControl(request, response);
     // Set 404 status code for 404.html page. We do not need normalised URI as it will always be "/404.html"
     if (uri.endsWith("/404.html")) {
       response.status = "404";
@@ -796,6 +798,37 @@ const isOriginResponse = (
   event: OriginRequestEvent | OriginResponseEvent
 ): event is OriginResponseEvent => {
   return event.Records[0].cf.config.eventType === "origin-response";
+};
+
+const setCacheControl = (
+  request: CloudFrontRequest,
+  response: CloudFrontResponse
+) => {
+  if (!response.headers || !request.origin?.s3) {
+    return false;
+  }
+  const expiresHeader = response.headers["expires"];
+  if (!expiresHeader) {
+    return false;
+  }
+  const expires = new Date(expiresHeader[0].value);
+  const maxAge = Math.floor((expires.getTime() - new Date().getTime()) / 1000);
+  if (maxAge <= 0) {
+    response.headers["cache-control"] = [
+      {
+        key: "Cache-Control",
+        value: "public, max-age=0, s-maxage=0, must-revalidate"
+      }
+    ];
+    return true;
+  }
+  response.headers["cache-control"] = [
+    {
+      key: "Cache-Control",
+      value: `public, max-age=0, s-maxage=${maxAge}, must-revalidate`
+    }
+  ];
+  return false;
 };
 
 const hasFallbackForUri = (

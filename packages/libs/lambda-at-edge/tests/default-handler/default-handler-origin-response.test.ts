@@ -219,6 +219,62 @@ describe("Lambda@Edge origin response", () => {
       ).toBeLessThan(new Date().getTime() + 300000);
     });
 
+    it("serves fresh page with caching", async () => {
+      const event = createCloudFrontEvent({
+        uri: "/fallback-blocking/fresh.html",
+        host: "mydistribution.cloudfront.net",
+        config: { eventType: "origin-response" } as any,
+        response: {
+          headers: {
+            expires: [
+              {
+                key: "Expires",
+                value: new Date(new Date().getTime() + 30000).toUTCString()
+              }
+            ]
+          },
+          status: "200"
+        } as any
+      });
+
+      const response = await handler(event);
+
+      const headers = response.headers as CloudFrontHeaders;
+      // s-maxage should be about 29, but could go lower if tests run slow
+      const prefix = "public, max-age=0, s-maxage=";
+      const maxAge = parseInt(
+        headers["cache-control"][0].value.slice(prefix.length)
+      );
+      expect(maxAge).toBeGreaterThan(20);
+      expect(maxAge).toBeLessThan(30);
+    });
+
+    it("serves stale page with no caching", async () => {
+      const event = createCloudFrontEvent({
+        uri: "/fallback-blocking/stale.html",
+        host: "mydistribution.cloudfront.net",
+        config: { eventType: "origin-response" } as any,
+        response: {
+          headers: {
+            expires: [
+              {
+                key: "Expires",
+                value: "Wed, 21 Apr 2021 04:47:27 GMT"
+              }
+            ]
+          },
+          status: "200"
+        } as any
+      });
+
+      const response = await handler(event);
+
+      const headers = response.headers as CloudFrontHeaders;
+      expect(headers["cache-control"][0].value).toEqual(
+        "public, max-age=0, s-maxage=0, must-revalidate"
+      );
+    });
+
     it("renders and uploads HTML and JSON for fallback SSG data requests", async () => {
       const event = createCloudFrontEvent({
         uri: "/_next/data/build-id/fallback/not-yet-built.json",
