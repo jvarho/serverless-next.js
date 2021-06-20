@@ -68,7 +68,17 @@ describe("Default handler", () => {
     };
     routesManifest = {
       basePath: "",
-      headers: [],
+      headers: [
+        {
+          source: "/ssr",
+          headers: [
+            {
+              key: "X-Test-Header",
+              value: "value"
+            }
+          ]
+        }
+      ],
       redirects: [
         {
           source: "/redirect-simple",
@@ -302,7 +312,26 @@ describe("Default handler", () => {
     });
   });
 
-  describe("Redirect", () => {
+  describe("Headers", () => {
+    it.each`
+      uri
+      ${"/ssr"}
+    `("Sets headers for $uri", async ({ uri }) => {
+      const e = event(uri);
+
+      await handleDefault(
+        e,
+        manifest,
+        prerenderManifest,
+        routesManifest,
+        getPage
+      );
+
+      expect(e.res.setHeader).toHaveBeenCalledWith("X-Test-Header", "value");
+    });
+  });
+
+  describe("Redirects", () => {
     it.each`
       uri                          | code   | destination
       ${"/ssg/"}                   | ${308} | ${"/ssg"}
