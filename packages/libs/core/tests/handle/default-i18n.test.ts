@@ -33,6 +33,26 @@ describe("Default handler (i18n)", () => {
       version: 3,
       notFoundRoutes: [],
       routes: {
+        "/en/404": {
+          initialRevalidateSeconds: false,
+          srcRoute: null,
+          dataRoute: "unused"
+        },
+        "/fr/404": {
+          initialRevalidateSeconds: false,
+          srcRoute: null,
+          dataRoute: "unused"
+        },
+        "/en/500": {
+          initialRevalidateSeconds: false,
+          srcRoute: null,
+          dataRoute: "unused"
+        },
+        "/fr/500": {
+          initialRevalidateSeconds: false,
+          srcRoute: null,
+          dataRoute: "unused"
+        },
         "/en/ssg": {
           initialRevalidateSeconds: false,
           srcRoute: null,
@@ -93,10 +113,6 @@ describe("Default handler (i18n)", () => {
     pagesManifest = {
       "/en": "pages/en.html",
       "/fr": "pages/fr.html",
-      "/en/404": "pages/en/404.html",
-      "/fr/404": "pages/fr/404.html",
-      "/en/500": "pages/en/500.html",
-      "/fr/500": "pages/fr/500.html",
       "/en/[root]": "pages/en/[root].html",
       "/fr/[root]": "pages/fr/[root].html",
       "/en/html/[page]": "pages/en/html/[page].html",
@@ -122,28 +138,6 @@ describe("Default handler (i18n)", () => {
   beforeEach(() => {
     jest.spyOn(console, "error").mockReturnValueOnce();
     getPage = jest.fn();
-  });
-
-  describe("Public file", () => {
-    it.each`
-      uri
-      ${"/favicon.ico"}
-      ${"/name%20with%20spaces.txt"}
-    `("Routes $uri to public file", async ({ uri }) => {
-      const route = await handleDefault(
-        event(uri),
-        manifest,
-        prerenderManifest,
-        routesManifest,
-        getPage
-      );
-
-      expect(route).toBeTruthy();
-      if (route) {
-        expect(route.isPublicFile).toBeTruthy();
-        expect(route.file).toEqual(uri);
-      }
-    });
   });
 
   describe("Non-dynamic", () => {
@@ -196,10 +190,12 @@ describe("Default handler (i18n)", () => {
     });
 
     it.each`
-      uri                                     | page
-      ${"/ssr"}                               | ${"pages/ssr.js"}
-      ${"/_next/data/test-build-id/ssr.json"} | ${"pages/ssr.js"}
-    `("Routes SSR request $uri to page $page", async ({ uri, page }) => {
+      uri                                     | file
+      ${"/ssr"}                               | ${"pages/en/500.html"}
+      ${"/en/ssr"}                            | ${"pages/en/500.html"}
+      ${"/fr/ssr"}                            | ${"pages/fr/500.html"}
+      ${"/_next/data/test-build-id/ssr.json"} | ${"pages/en/500.html"}
+    `("Routes SSR request $uri to pages/ssr.js", async ({ uri, file }) => {
       const route = await handleDefault(
         event(uri),
         manifest,
@@ -208,13 +204,13 @@ describe("Default handler (i18n)", () => {
         getPage
       );
 
-      expect(getPage).toHaveBeenCalledWith(page);
+      expect(getPage).toHaveBeenCalledWith("pages/ssr.js");
 
       // mocked getPage throws an error in render, so error page returned
       expect(route).toBeTruthy();
       if (route) {
         expect(route.isStatic).toBeTruthy();
-        expect(route.file).toEqual("pages/en/500.html");
+        expect(route.file).toEqual(file);
       }
     });
   });
@@ -269,10 +265,12 @@ describe("Default handler (i18n)", () => {
     });
 
     it.each`
-      uri                                       | page
-      ${"/ssr/1"}                               | ${"pages/ssr/[id].js"}
-      ${"/_next/data/test-build-id/ssr/1.json"} | ${"pages/ssr/[id].js"}
-    `("Routes SSR request $uri to page $page", async ({ uri, page }) => {
+      uri                                       | file
+      ${"/ssr/1"}                               | ${"pages/en/500.html"}
+      ${"/en/ssr/1"}                            | ${"pages/en/500.html"}
+      ${"/fr/ssr/1"}                            | ${"pages/fr/500.html"}
+      ${"/_next/data/test-build-id/ssr/1.json"} | ${"pages/en/500.html"}
+    `("Routes SSR request $uri to pages/ssr/[id].js", async ({ uri, file }) => {
       const route = await handleDefault(
         event(uri),
         manifest,
@@ -281,24 +279,28 @@ describe("Default handler (i18n)", () => {
         getPage
       );
 
-      expect(getPage).toHaveBeenCalledWith(page);
+      expect(getPage).toHaveBeenCalledWith("pages/ssr/[id].js");
 
       // mocked getPage throws an error in render, so error page returned
       expect(route).toBeTruthy();
       if (route) {
         expect(route.isStatic).toBeTruthy();
-        expect(route.file).toEqual("pages/en/500.html");
+        expect(route.file).toEqual(file);
       }
     });
   });
 
   describe("Redirect", () => {
     it.each`
-      uri                   | code   | destination
-      ${"/ssg/"}            | ${308} | ${"/ssg"}
-      ${"/favicon.ico/"}    | ${308} | ${"/favicon.ico"}
-      ${"/redirect-simple"} | ${307} | ${"/en/redirect-target"}
-      ${"/redirect/test"}   | ${308} | ${"/en/redirect-target/test"}
+      uri                      | code   | destination
+      ${"/ssg/"}               | ${308} | ${"/ssg"}
+      ${"/favicon.ico/"}       | ${308} | ${"/favicon.ico"}
+      ${"/redirect-simple"}    | ${307} | ${"/en/redirect-target"}
+      ${"/redirect/test"}      | ${308} | ${"/en/redirect-target/test"}
+      ${"/en/redirect-simple"} | ${307} | ${"/en/redirect-target"}
+      ${"/en/redirect/test"}   | ${308} | ${"/en/redirect-target/test"}
+      ${"/fr/redirect-simple"} | ${307} | ${"/fr/redirect-target"}
+      ${"/fr/redirect/test"}   | ${308} | ${"/fr/redirect-target/test"}
     `(
       "Redirects $uri to $destination with code $code",
       async ({ code, destination, uri }) => {
