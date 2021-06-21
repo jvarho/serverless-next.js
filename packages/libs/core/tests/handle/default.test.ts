@@ -96,7 +96,28 @@ describe("Default handler", () => {
           statusCode: 307
         }
       ],
-      rewrites: []
+      rewrites: [
+        {
+          source: "/rewrite-ssg",
+          destination: "/ssg"
+        },
+        {
+          source: "/rewrite-ssr",
+          destination: "/ssr"
+        },
+        {
+          source: "/rewrite-path/:slug",
+          destination: "/:slug"
+        },
+        {
+          source: "/rewrite-query/:slug",
+          destination: "/ssr"
+        },
+        {
+          source: "/rewrite-external",
+          destination: "https://ext.example.com"
+        }
+      ]
     };
     pagesManifest = {
       "/": "pages/index.html",
@@ -155,10 +176,11 @@ describe("Default handler", () => {
 
   describe("Non-dynamic", () => {
     it.each`
-      uri             | file
-      ${"/"}          | ${"pages/index.html"}
-      ${"/ssg"}       | ${"pages/ssg.html"}
-      ${"/not/found"} | ${"pages/404.html"}
+      uri               | file
+      ${"/"}            | ${"pages/index.html"}
+      ${"/ssg"}         | ${"pages/ssg.html"}
+      ${"/not/found"}   | ${"pages/404.html"}
+      ${"/rewrite-ssg"} | ${"pages/ssg.html"}
     `("Routes static page $uri to file $file", async ({ uri, file }) => {
       const route = await handleDefault(
         event(uri),
@@ -225,6 +247,8 @@ describe("Default handler", () => {
       uri                                     | page
       ${"/ssr"}                               | ${"pages/ssr.js"}
       ${"/_next/data/test-build-id/ssr.json"} | ${"pages/ssr.js"}
+      ${"/rewrite-ssr"}                       | ${"pages/ssr.js"}
+      ${"/rewrite-query/test"}                | ${"pages/ssr.js"}
     `("Routes SSR request $uri to page $page", async ({ uri, page }) => {
       const route = await handleDefault(
         event(uri),
@@ -252,6 +276,7 @@ describe("Default handler", () => {
       ${"/foo"}          | ${"pages/[root].html"}
       ${"/html/bar"}     | ${"pages/html/[page].html"}
       ${"/fallback/new"} | ${"pages/fallback/new.html"}
+      ${"/rewrite-path"} | ${"pages/[root].html"}
     `("Routes static page $uri to file $file", async ({ uri, file }) => {
       const route = await handleDefault(
         event(uri),
@@ -271,6 +296,7 @@ describe("Default handler", () => {
     it.each`
       uri                                              | file
       ${"/_next/data/test-build-id/fallback/new.json"} | ${"/_next/data/test-build-id/fallback/new.json"}
+      ${"/_next/data/test-build-id/not-found.json"}    | ${"pages/404.html"}
     `("Routes static data route $uri to file $file", async ({ uri, file }) => {
       const route = await handleDefault(
         event(uri),
@@ -381,5 +407,27 @@ describe("Default handler", () => {
         expect(e.res.end).toHaveBeenCalled();
       }
     );
+  });
+
+  describe("External rewrite", () => {
+    it.each`
+      uri                    | path
+      ${"/rewrite-external"} | ${"https://ext.example.com"}
+    `("Returns external rewrite from $uri to $path", async ({ path, uri }) => {
+      const e = event(uri);
+      const route = await handleDefault(
+        e,
+        manifest,
+        prerenderManifest,
+        routesManifest,
+        getPage
+      );
+
+      expect(route).toBeTruthy();
+      if (route) {
+        expect(route.isExternal).toBeTruthy();
+        expect((route as any).path).toEqual(path);
+      }
+    });
   });
 });

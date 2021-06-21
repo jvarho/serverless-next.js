@@ -70,7 +70,28 @@ describe("Api handler", () => {
           statusCode: 307
         }
       ],
-      rewrites: []
+      rewrites: [
+        {
+          source: "/rewrite",
+          destination: "/api/static"
+        },
+        {
+          source: "/rewrite-not-found",
+          destination: "/api/not/found"
+        },
+        {
+          source: "/rewrite/:slug",
+          destination: "/api/dynamic/:slug"
+        },
+        {
+          source: "/rewrite-query/:slug",
+          destination: "/api/static"
+        },
+        {
+          source: "/rewrite-external",
+          destination: "https://ext.example.com"
+        }
+      ]
     };
     pagesManifest = {
       "/": "pages/index.html",
@@ -104,10 +125,13 @@ describe("Api handler", () => {
 
   describe("Api pages", () => {
     it.each`
-      uri                 | page
-      ${"/api"}           | ${"pages/api/index.js"}
-      ${"/api/static"}    | ${"pages/api/static.js"}
-      ${"/api/dynamic/1"} | ${"pages/api/dynamic/[id].js"}
+      uri                   | page
+      ${"/api"}             | ${"pages/api/index.js"}
+      ${"/api/static"}      | ${"pages/api/static.js"}
+      ${"/api/dynamic/1"}   | ${"pages/api/dynamic/[id].js"}
+      ${"/rewrite"}         | ${"pages/api/static.js"}
+      ${"/rewrite/2"}       | ${"pages/api/dynamic/[id].js"}
+      ${"/rewrite-query/3"} | ${"pages/api/static.js"}
     `("Routes api request $uri to page $page", async ({ uri, page }) => {
       const route = await handleApi(
         event(uri),
@@ -124,6 +148,7 @@ describe("Api handler", () => {
       uri
       ${"/api/notfound"}
       ${"/api/dynamic/not/found"}
+      ${"/rewrite-not-found"}
     `("Returns 404 for $uri", async ({ uri }) => {
       const e = event(uri);
       const route = await handleApi(e, manifest, routesManifest, getPage);
@@ -182,5 +207,21 @@ describe("Api handler", () => {
         expect(e.res.end).toHaveBeenCalled();
       }
     );
+  });
+
+  describe("External rewrite", () => {
+    it.each`
+      uri                    | path
+      ${"/rewrite-external"} | ${"https://ext.example.com"}
+    `("Returns external rewrite from $uri to $path", async ({ path, uri }) => {
+      const e = event(uri);
+      const route = await handleApi(e, manifest, routesManifest, getPage);
+
+      expect(route).toBeTruthy();
+      if (route) {
+        expect(route.isExternal).toBeTruthy();
+        expect((route as any).path).toEqual(path);
+      }
+    });
   });
 });
