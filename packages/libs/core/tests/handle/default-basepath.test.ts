@@ -33,7 +33,7 @@ describe("Default handler (basepath)", () => {
       version: 3,
       notFoundRoutes: [],
       routes: {
-        "/ssg": {
+        "/": {
           initialRevalidateSeconds: false,
           srcRoute: null,
           dataRoute: "unused"
@@ -76,14 +76,14 @@ describe("Default handler (basepath)", () => {
       rewrites: []
     };
     pagesManifest = {
-      "/": "pages/index.html",
+      "/": "pages/index.js",
       "/404": "pages/404.html",
       "/500": "pages/500.html",
+      "/html": "pages/html.html",
       "/[root]": "pages/[root].html",
       "/html/[page]": "pages/html/[page].html",
       "/ssr": "pages/ssr.js",
       "/ssr/[id]": "pages/ssr/[id].js",
-      "/ssg": "pages/ssg.js",
       "/fallback/[slug]": "pages/fallback/[slug].js"
     };
     const buildId = "test-build-id";
@@ -130,9 +130,9 @@ describe("Default handler (basepath)", () => {
     it.each`
       uri                  | file
       ${"/base"}           | ${"pages/index.html"}
-      ${"/base/ssg"}       | ${"pages/ssg.html"}
+      ${"/base/html"}      | ${"pages/html.html"}
       ${"/base/not/found"} | ${"pages/404.html"}
-      ${"/ssg"}            | ${"pages/404.html"}
+      ${"/html"}           | ${"pages/404.html"}
     `("Routes static page $uri to file $file", async ({ uri, file }) => {
       const route = await handleDefault(
         event(uri),
@@ -150,8 +150,9 @@ describe("Default handler (basepath)", () => {
     });
 
     it.each`
-      uri                                          | file
-      ${"/base/_next/data/test-build-id/ssg.json"} | ${"/_next/data/test-build-id/ssg.json"}
+      uri                                            | file
+      ${"/base/_next/data/test-build-id.json"}       | ${"/_next/data/test-build-id/index.json"}
+      ${"/base/_next/data/test-build-id/index.json"} | ${"/_next/data/test-build-id/index.json"}
     `("Routes static data route $uri to file $file", async ({ uri, file }) => {
       const route = await handleDefault(
         event(uri),
