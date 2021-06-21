@@ -297,6 +297,7 @@ describe("Default handler", () => {
       uri                                              | file
       ${"/_next/data/test-build-id/fallback/new.json"} | ${"/_next/data/test-build-id/fallback/new.json"}
       ${"/_next/data/test-build-id/not-found.json"}    | ${"pages/404.html"}
+      ${"/_next/data/not-build-id/fallback/new.json"}  | ${"pages/404.html"}
     `("Routes static data route $uri to file $file", async ({ uri, file }) => {
       const route = await handleDefault(
         event(uri),

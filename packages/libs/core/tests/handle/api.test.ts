@@ -1,4 +1,3 @@
-import jwt from "jsonwebtoken";
 import { PrerenderManifest } from "next/dist/build";
 import {
   ApiManifest,
