@@ -7,10 +7,10 @@ import {
   RoutesManifest
 } from "../../src";
 
-const event = (url: string): Event => {
+const event = (url: string, headers?: { [key: string]: string }): Event => {
   return {
     req: {
-      headers: [],
+      headers: headers ?? {},
       url
     } as any,
     res: {
@@ -317,6 +317,76 @@ describe("Default handler (i18n)", () => {
         expect(e.res.statusCode).toEqual(code);
         expect(e.res.setHeader).toHaveBeenCalledWith("Location", destination);
         expect(e.res.end).toHaveBeenCalled();
+      }
+    );
+
+    it.each`
+      uri       | lang    | destination
+      ${"/"}    | ${"en"} | ${null}
+      ${"/"}    | ${"fr"} | ${"/fr"}
+      ${"/en"}  | ${"en"} | ${null}
+      ${"/en"}  | ${"fr"} | ${null}
+      ${"/fr"}  | ${"en"} | ${null}
+      ${"/fr"}  | ${"fr"} | ${null}
+      ${"/ssg"} | ${"en"} | ${null}
+      ${"/ssg"} | ${"fr"} | ${null}
+    `(
+      "Redirects accept-lang $lang from $uri to $destination",
+      async ({ lang, destination, uri }) => {
+        const e = event(uri, {
+          "Accept-Language": lang
+        });
+        const route = await handleDefault(
+          e,
+          manifest,
+          prerenderManifest,
+          routesManifest,
+          getPage
+        );
+
+        if (destination) {
+          expect(route).toBeFalsy();
+          expect(e.res.statusCode).toEqual(307);
+          expect(e.res.setHeader).toHaveBeenCalledWith("Location", destination);
+          expect(e.res.end).toHaveBeenCalled();
+        } else {
+          expect(route).toBeTruthy();
+        }
+      }
+    );
+
+    it.each`
+      uri       | lang    | destination
+      ${"/"}    | ${"en"} | ${null}
+      ${"/"}    | ${"fr"} | ${"/fr"}
+      ${"/en"}  | ${"en"} | ${null}
+      ${"/en"}  | ${"fr"} | ${null}
+      ${"/fr"}  | ${"en"} | ${null}
+      ${"/fr"}  | ${"fr"} | ${null}
+      ${"/ssg"} | ${"en"} | ${null}
+      ${"/ssg"} | ${"fr"} | ${null}
+    `(
+      "Redirects NEXT_LOCALE $lang from $uri to $destination",
+      async ({ lang, destination, uri }) => {
+        const e = event(uri, {
+          Cookie: `NEXT_LOCALE=${lang}`
+        });
+        const route = await handleDefault(
+          e,
+          manifest,
+          prerenderManifest,
+          routesManifest,
+          getPage
+        );
+
+        if (destination) {
+          expect(route).toBeFalsy();
+          expect(e.res.statusCode).toEqual(307);
+          expect(e.res.setHeader).toHaveBeenCalledWith("Location", destination);
+          expect(e.res.end).toHaveBeenCalled();
+        } else {
+          expect(route).toBeTruthy();
+        }
       }
     );
   });
