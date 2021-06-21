@@ -21,7 +21,7 @@ const event = (url: string, headers?: { [key: string]: string }): Event => {
   };
 };
 
-describe("Default handler", () => {
+describe("Default handler (trailing slash)", () => {
   let pagesManifest: { [key: string]: string };
   let manifest: PageManifest;
   let prerenderManifest: PrerenderManifest;

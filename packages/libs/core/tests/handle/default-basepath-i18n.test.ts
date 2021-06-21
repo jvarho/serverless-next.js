@@ -21,7 +21,7 @@ const event = (url: string): Event => {
   };
 };
 
-describe("Default handler (i18n)", () => {
+describe("Default handler (basepath + i18n)", () => {
   let pagesManifest: { [key: string]: string };
   let manifest: PageManifest;
   let prerenderManifest: PrerenderManifest;
