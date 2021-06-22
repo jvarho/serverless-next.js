@@ -43,16 +43,6 @@ describe("Default handler (basepath + i18n)", () => {
           srcRoute: null,
           dataRoute: "unused"
         },
-        "/en/500": {
-          initialRevalidateSeconds: false,
-          srcRoute: null,
-          dataRoute: "unused"
-        },
-        "/fr/500": {
-          initialRevalidateSeconds: false,
-          srcRoute: null,
-          dataRoute: "unused"
-        },
         "/en/ssg": {
           initialRevalidateSeconds: false,
           srcRoute: null,
@@ -191,28 +181,23 @@ describe("Default handler (basepath + i18n)", () => {
     });
 
     it.each`
-      uri                                          | file
-      ${"/base/ssr"}                               | ${"pages/en/500.html"}
-      ${"/base/en/ssr"}                            | ${"pages/en/500.html"}
-      ${"/base/fr/ssr"}                            | ${"pages/fr/500.html"}
-      ${"/base/_next/data/test-build-id/ssr.json"} | ${"pages/en/500.html"}
-    `("Routes SSR request $uri to pages/ssr.js", async ({ uri, file }) => {
-      const route = await handleDefault(
-        event(uri),
-        manifest,
-        prerenderManifest,
-        routesManifest,
-        getPage
-      );
+      uri
+      ${"/base/ssr"}
+      ${"/base/en/ssr"}
+      ${"/base/fr/ssr"}
+      ${"/base/_next/data/test-build-id/ssr.json"}
+    `("Routes SSR request $uri to pages/ssr.js", async ({ uri }) => {
+      await expect(
+        handleDefault(
+          event(uri),
+          manifest,
+          prerenderManifest,
+          routesManifest,
+          getPage
+        )
+      ).rejects.toThrow(TypeError);
 
       expect(getPage).toHaveBeenCalledWith("pages/ssr.js");
-
-      // mocked getPage throws an error in render, so error page returned
-      expect(route).toBeTruthy();
-      if (route) {
-        expect(route.isStatic).toBeTruthy();
-        expect(route.file).toEqual(file);
-      }
     });
   });
 
@@ -266,28 +251,23 @@ describe("Default handler (basepath + i18n)", () => {
     });
 
     it.each`
-      uri                                            | file
-      ${"/base/ssr/1"}                               | ${"pages/en/500.html"}
-      ${"/base/en/ssr/1"}                            | ${"pages/en/500.html"}
-      ${"/base/fr/ssr/1"}                            | ${"pages/fr/500.html"}
-      ${"/base/_next/data/test-build-id/ssr/1.json"} | ${"pages/en/500.html"}
-    `("Routes SSR request $uri to pages/ssr/[id].js", async ({ uri, file }) => {
-      const route = await handleDefault(
-        event(uri),
-        manifest,
-        prerenderManifest,
-        routesManifest,
-        getPage
-      );
+      uri
+      ${"/base/ssr/1"}
+      ${"/base/en/ssr/1"}
+      ${"/base/fr/ssr/1"}
+      ${"/base/_next/data/test-build-id/ssr/1.json"}
+    `("Routes SSR request $uri to pages/ssr/[id].js", async ({ uri }) => {
+      await expect(
+        handleDefault(
+          event(uri),
+          manifest,
+          prerenderManifest,
+          routesManifest,
+          getPage
+        )
+      ).rejects.toThrow(TypeError);
 
       expect(getPage).toHaveBeenCalledWith("pages/ssr/[id].js");
-
-      // mocked getPage throws an error in render, so error page returned
-      expect(route).toBeTruthy();
-      if (route) {
-        expect(route.isStatic).toBeTruthy();
-        expect(route.file).toEqual(file);
-      }
     });
   });
 
